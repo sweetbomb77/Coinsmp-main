@@ -1,0 +1,30 @@
+.teams-section{padding-top:130px;padding-bottom:130px;background:radial-gradient(ellipse at 85% 55%,rgba(25,96,44,.2),transparent 55%)}
+.teams-section .page-wrap{width:min(1400px,calc(100% - 36px))}
+.team-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:stretch}
+.team-card{min-height:500px;padding-bottom:22px;border-color:color-mix(in srgb,var(--team),transparent 58%);background:linear-gradient(140deg,color-mix(in srgb,var(--team),#102218 8%),#0a1a10 68%);box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.team-card:before{border-color:color-mix(in srgb,var(--team),transparent 65%);box-shadow:0 0 0 14px color-mix(in srgb,var(--team),transparent 94%),0 0 0 30px color-mix(in srgb,var(--team),transparent 96%)}
+.team-top{gap:8px;padding:27px 20px 17px}
+.team-name-wrap{gap:10px}
+.team-swatch{width:9px;height:31px}
+.team-name{font-size:clamp(29px,2.5vw,36px)}
+.team-members{padding:5px 8px;font-size:8px}
+.team-balance-label{margin-top:28px;padding:0 20px;font-size:10px}
+.team-balance{padding:0 20px;margin-top:4px;font-size:clamp(31px,2.8vw,42px)}
+.team-metrics{gap:8px;margin:20px 20px 15px}
+.team-metric{padding-top:12px}
+.team-metric b{font-size:23px}
+.team-metric span{font-size:9px;color:#9aaa9d}
+.roster{margin-top:10px;border-top-color:rgba(255,255,255,.14)}
+.roster-heading,.player-row{grid-template-columns:minmax(130px,1.6fr) minmax(48px,.55fr) repeat(4,minmax(58px,.8fr));gap:9px;padding:14px 18px}
+.roster-heading{font-size:10px;letter-spacing:.035em}
+.player-row{font-size:14px;line-height:1.45}
+.player-name{font-size:16px;font-weight:750}
+.player-tier{font-size:13px;font-weight:700}
+.player-row .num{font-size:14px}
+.empty-roster{padding:20px 18px;font-size:10px}
+.online-dot{display:inline-block;width:8px;height:8px;flex:none;margin-right:7px;border-radius:50%;background:#6f7c70;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);vertical-align:middle}.online-dot.is-online{background:#42dc6c;box-shadow:0 0 9px rgba(66,220,108,.72)}.player-name{display:flex;align-items:center}.all-players-section{padding:90px 0;background:linear-gradient(180deg,rgba(15,39,23,.52),rgba(8,23,14,.82));border-top:1px solid rgba(222,190,71,.1)}.players-heading{align-items:end}.search-box{display:flex;align-items:center;gap:10px;width:min(270px,45%);height:42px;padding:0 12px;border:1px solid rgba(222,190,71,.24);color:var(--gold);background:rgba(8,20,12,.65)}.search-box input{width:100%;border:0;outline:0;background:transparent;color:#fff;font-size:12px}.search-box input::placeholder{color:#819184}.table-shell{overflow:auto;border:1px solid var(--line);background:rgba(12,30,17,.8)}table{width:100%;min-width:800px;border-collapse:collapse}thead{background:rgba(222,190,71,.06)}th{padding:15px 18px;text-align:left;color:#9aaa9d;font-size:8px;font-weight:850;letter-spacing:.14em}td{padding:14px 18px;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:#d6ded5}tbody tr:hover{background:rgba(51,166,77,.06)}.full-player-name{display:inline-flex;align-items:center;font-weight:750}.team-chip{--team:#879487;display:inline-block;padding:4px 8px;background:color-mix(in srgb,var(--team),transparent 90%);color:var(--team);font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.tier-chip{display:inline-block;padding:3px 8px;border:1px solid rgba(222,190,71,.25);color:#d0b967;font-size:9px;font-weight:800}.money-cell{color:#d8bf69;font-weight:800}.status-label{color:#a1aaa1;font-size:8px;font-weight:800;letter-spacing:.12em}.status-label.online{color:#67d985}.table-empty{text-align:center;color:#859487;padding:34px}.table-foot{margin-top:12px;color:#829487;font-size:9px;font-weight:800;letter-spacing:.1em}
+.activity-section{padding:76px 0;background:linear-gradient(180deg,rgba(12,31,18,.82),rgba(8,22,13,.94));border-block:1px solid rgba(222,190,71,.12)}.activity-section .section-heading{margin-bottom:24px}.activity-list{display:grid;gap:9px}.activity-row{display:grid;grid-template-columns:80px 150px minmax(0,1fr);align-items:center;gap:16px;padding:14px 18px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}.activity-row time{color:#a4b1a5;font-variant-numeric:tabular-nums;font-size:13px}.activity-kind{color:#dfc56a;font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.activity-message{color:#e2e8e1;font-size:15px}.activity-empty{padding:20px;border:1px dashed rgba(222,190,71,.2);color:#9aaa9d;font-size:14px}.activity-status{color:#9aaa9d;font-size:11px}
+@media(max-width:1150px){.team-name{font-size:32px}.team-balance{font-size:36px}}
+@media(max-width:900px){.all-players-section{padding:70px 0}.players-heading{align-items:flex-start;flex-direction:column;gap:16px}.search-box{width:min(360px,100%)}}
+@media(max-width:850px){.roster-heading,.player-row{grid-template-columns:minmax(105px,1.3fr) minmax(42px,.5fr) repeat(4,minmax(48px,.75fr));gap:5px;padding:12px 11px}.roster-heading{font-size:8px}.player-row,.player-row .num{font-size:12px}.player-name{font-size:13px}}
+@media(max-width:650px){.teams-section{padding-top:70px;padding-bottom:70px}.teams-section .page-wrap{width:calc(100% - 34px)}.team-grid{grid-template-columns:1fr}.team-card{min-height:unset}.team-top{padding:22px 18px 14px}.team-name{font-size:34px}.team-balance{font-size:36px}.team-metrics{margin-inline:18px}.roster-heading,.player-row{grid-template-columns:minmax(100px,1.3fr) minmax(40px,.5fr) repeat(4,minmax(47px,.75fr));gap:4px;padding-inline:9px}.activity-row{grid-template-columns:58px 100px minmax(0,1fr);gap:8px;padding:11px 9px}.activity-row time{font-size:11px}.activity-kind{font-size:9px}.activity-message{font-size:12px}.all-players-section{padding:55px 0}.table-shell{margin-right:-17px;width:calc(100% + 17px)}}
