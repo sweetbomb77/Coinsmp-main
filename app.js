@@ -8,6 +8,7 @@ let currentEvents=[];
 let expandedPlayers=new Set();
 let previousBalances=new Map();
 let observedGains=[];
+let observedLosses=[];
 const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(Number(value)||0);
 const number=value=>new Intl.NumberFormat('en-GB').format(Number(value)||0);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -37,9 +38,13 @@ function observeBalanceIncreases(players){
     const balance=Number(player.balance)||0;
     const team=assignedTeam(player);
     const previous=previousBalances.get(id);
-    if(previous&&team&&previous.team&&balance-previous.balance>0.004){
-      observedGains.unshift({id,name:String(player.name||'Unknown'),team,amount:balance-previous.balance,timestamp:now,type:'balance_gain'});
+    const delta=balance-(previous?.balance??balance);
+    if(previous&&team&&previous.team&&delta>0.004){
+      observedGains.unshift({id,name:String(player.name||'Unknown'),team,amount:delta,timestamp:now,type:'balance_gain'});
       observedGains=observedGains.slice(0,50);
+    }else if(previous&&team&&previous.team&&delta< -0.004){
+      observedLosses.unshift({id,name:String(player.name||'Unknown'),team,amount:-delta,timestamp:now,type:'balance_loss'});
+      observedLosses=observedLosses.slice(0,50);
     }
     previousBalances.set(id,{balance,team,name:String(player.name||'Unknown')});
   }
@@ -56,7 +61,12 @@ function renderTeams(players,apiTeams){
 }
 function renderAllPlayers(players){
   const query=$('playerSearch').value.trim().toLowerCase();
-  const rows=players.filter(p=>[p.name,p.team,p.tier].some(value=>String(value||'').toLowerCase().includes(query))).sort((a,b)=>String(a.team||'').localeCompare(String(b.team||''))||String(a.name||'').localeCompare(String(b.name||''),undefined,{sensitivity:'base'}));
+  const tierSelect=$('tierFilter');
+  const selectedTier=tierSelect.value||'all';
+  const tiers=[...new Set(players.map(playerTier))].sort((a,b)=>{const rank=['S','A','B','C','D','F'];const ai=rank.indexOf(a.toUpperCase()),bi=rank.indexOf(b.toUpperCase());return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b)});
+  tierSelect.innerHTML='<option value="all">All tiers</option>'+tiers.map(tier=>`<option value="${esc(tier)}">${tier==='—'?'No tier':`Tier ${esc(tier)}`}</option>`).join('');
+  tierSelect.value=selectedTier==='all'||tiers.includes(selectedTier)?selectedTier:'all';
+  const rows=players.filter(p=>(tierSelect.value==='all'||playerTier(p)===tierSelect.value)&&[p.name,p.team,p.tier].some(value=>String(value||'').toLowerCase().includes(query))).sort((a,b)=>String(a.team||'').localeCompare(String(b.team||''))||String(a.name||'').localeCompare(String(b.name||''),undefined,{sensitivity:'base'}));
   $('playerCountLabel').textContent=`${number(rows.length)} assigned ${rows.length===1?'player':'players'}`;
   $('allPlayerRows').innerHTML=rows.length?rows.map(p=>{
     const team=assignedTeam(p)||'';const key=team.toLowerCase();const color=TEAM_COLORS[key]||'#879487';const tier=String(p.tier||'').toUpperCase()==='NONE'?'—':p.tier||'—';
@@ -65,12 +75,20 @@ function renderAllPlayers(players){
     return `<tr class="player-summary-row"><td><button class="player-toggle" type="button" data-player-id="${esc(id)}" aria-expanded="${open}" style="--team:${color}"><span class="expand-caret">${open?'▾':'▸'}</span><i class="online-dot ${p.online?'is-online':''}" title="${p.online?'Online':'Offline'}"></i>${esc(p.name||'Unknown')}</button></td><td><span class="team-chip" style="--team:${color}">${esc(team)}</span></td><td><span class="tier-chip">${esc(tier)}</span></td><td class="money-cell">${money(p.balance)}</td><td>${number(p.kills)}</td><td>${number(p.deaths)}</td><td>${number(p.capturePointsGrabbed)}</td><td><span class="status-label ${p.online?'online':''}">${p.online?'ONLINE':'OFFLINE'}</span></td></tr>${details}`;
   }).join(''):'<tr><td colspan="8" class="table-empty">No assigned players match that search.</td></tr>';
 }
+function playerTier(player){return String(player.tier||'').toUpperCase()==='NONE'?'—':String(player.tier||'—')}
+function matchingKillPayout(killer,victim,timestamp){
+  const killerId=String(killer.uuid||killer.name||'');const victimId=String(victim.uuid||victim.name||'');
+  const possibleGains=observedGains.filter(g=>g.id===killerId&&Math.abs(g.timestamp-timestamp)<=15000).sort((a,b)=>Math.abs(a.timestamp-timestamp)-Math.abs(b.timestamp-timestamp));
+  for(const gain of possibleGains){const matchedLoss=observedLosses.find(loss=>loss.id===victimId&&Math.abs(loss.timestamp-gain.timestamp)<=2000&&Math.abs(loss.amount-gain.amount)<=0.01);if(matchedLoss)return gain}
+  return null;
+}
 function playerDetails(player){
   const name=String(player.name||'Unknown');
   const team=assignedTeam(player)||'';
   const id=String(player.uuid||name);
   const teamColor=TEAM_COLORS[team.toLowerCase()]||'#879487';
   const playerEvents=[];
+  const usedGains=new Set();
   for(const event of currentEvents){
     const type=String(event.type||'');
     const message=String(event.message||'');
@@ -80,7 +98,8 @@ function playerDetails(player){
       const victim=currentPlayers.find(p=>String(p.name||'').toLowerCase()===match[2].toLowerCase());
       if(!victim||!assignedTeam(victim))continue;
       const victimTeam=assignedTeam(victim);const victimColor=TEAM_COLORS[victimTeam.toLowerCase()]||'#879487';
-      playerEvents.push({timestamp:Number(event.timestamp)||0,html:`Eliminated <b style="color:${victimColor}">${esc(victim.name)}</b> <span class="detail-muted">(${esc(victimTeam)} team)</span>`});
+      const timestamp=Number(event.timestamp)||0;const payout=matchingKillPayout(player,victim,timestamp);if(payout)usedGains.add(payout);
+      playerEvents.push({timestamp,html:`Eliminated <b style="color:${victimColor}">${esc(victim.name)}</b> <span class="detail-muted">(${esc(victimTeam)} team)</span>${payout?` <span class="kill-payout">· Kill payout +${money(payout.amount)}</span>`:''}`});
     }else if(type==='capture'){
       const match=message.match(/^([A-Za-z0-9_]{1,16})\s+captured\s+(.+)$/i);
       if(match&&match[1].toLowerCase()===name.toLowerCase())playerEvents.push({timestamp:Number(event.timestamp)||0,html:`Captured <b>Point ${esc(match[2].replace(/^Point\s+/i,''))}</b>`});
@@ -88,17 +107,18 @@ function playerDetails(player){
       playerEvents.push({timestamp:Number(event.timestamp)||0,html:'Won a Gladiators match'});
     }
   }
-  const gains=observedGains.filter(g=>g.id===id).map(g=>({timestamp:g.timestamp,html:`Balance increased by <b class="gain-amount">${money(g.amount)}</b> <span class="detail-muted">(observed while this page was open)</span>`}));
+  const gains=observedGains.filter(g=>g.id===id&&!usedGains.has(g)).map(g=>({timestamp:g.timestamp,html:`Balance increased by <b class="gain-amount">${money(g.amount)}</b> <span class="detail-muted">(not matched to a kill)</span>`}));
   const history=[...playerEvents,...gains].sort((a,b)=>b.timestamp-a.timestamp).slice(0,15);
   const historyHtml=history.length?history.map(item=>`<li><time>${formatDate(item.timestamp)}</time><span>${item.html}</span></li>`).join(''):'<li class="detail-empty">No recent team activity recorded for this player.</li>';
   const tier=String(player.tier||'').toUpperCase()==='NONE'?'—':player.tier||'—';
-  return `<div class="player-detail" style="--team:${teamColor}"><div class="player-detail-heading"><b style="color:${teamColor}">${esc(name)}</b><span>${esc(team)} team · Tier ${esc(tier)}</span></div><div class="player-detail-stats"><div><small>CURRENT BALANCE</small><b>${money(player.balance)}</b></div><div><small>KILLS</small><b>${number(player.kills)}</b></div><div><small>DEATHS</small><b>${number(player.deaths)}</b></div><div><small>POINT CAPTURES</small><b>${number(player.capturePointsGrabbed)}</b></div><div><small>STATUS</small><b>${player.online?'ONLINE':'OFFLINE'}</b></div></div><h3>Recent player activity</h3><ul class="player-history">${historyHtml}</ul><p class="earnings-note">The API has no historical payout ledger. Balance increases shown here are observed between live refreshes while this page is open.</p></div>`;
+  return `<div class="player-detail" style="--team:${teamColor}"><div class="player-detail-heading"><b style="color:${teamColor}">${esc(name)}</b><span>${esc(team)} team · Tier ${esc(tier)}</span></div><div class="player-detail-stats"><div><small>CURRENT BALANCE</small><b>${money(player.balance)}</b></div><div><small>KILLS</small><b>${number(player.kills)}</b></div><div><small>DEATHS</small><b>${number(player.deaths)}</b></div><div><small>POINT CAPTURES</small><b>${number(player.capturePointsGrabbed)}</b></div><div><small>STATUS</small><b>${player.online?'ONLINE':'OFFLINE'}</b></div></div><h3>Recent player activity</h3><ul class="player-history">${historyHtml}</ul><p class="earnings-note">Kill payouts are shown only when a matching gain for the killer and debit from the defeated player are observed during this page session. The server API does not provide a saved transaction ledger.</p></div>`;
 }
 function formatDate(timestamp){return new Date(Number(timestamp)||Date.now()).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
 function renderActivity(events){
   const playerByName=new Map(currentPlayers.map(player=>[String(player.name||'').toLowerCase(),player]));
   const teamByName=new Map(currentPlayers.map(player=>[String(assignedTeam(player)||'').toLowerCase(),assignedTeam(player)]));
   const visible=[];
+  const usedGains=new Set();
   for(const event of events){
     const type=String(event.type||'');const message=String(event.message||'');const timestamp=Number(event.timestamp)||0;
     if(type==='kill'){
@@ -107,7 +127,8 @@ function renderActivity(events){
       const killer=playerByName.get(match[1].toLowerCase());const victim=playerByName.get(match[2].toLowerCase());
       if(!killer||!victim||!assignedTeam(killer)||!assignedTeam(victim)||String(killer.name).toLowerCase()===String(victim.name).toLowerCase())continue;
       const kc=TEAM_COLORS[assignedTeam(killer).toLowerCase()]||'#879487';const vc=TEAM_COLORS[assignedTeam(victim).toLowerCase()]||'#879487';
-      visible.push({timestamp,kind:'PLAYER KILL',html:`<b style="color:${kc}">${esc(killer.name)}</b> eliminated <b style="color:${vc}">${esc(victim.name)}</b> <span class="activity-side">(${esc(assignedTeam(victim))})</span>`});
+      const payout=matchingKillPayout(killer,victim,timestamp);if(payout)usedGains.add(payout);
+      visible.push({timestamp,kind:'PLAYER KILL',html:`<b style="color:${kc}">${esc(killer.name)}</b> eliminated <b style="color:${vc}">${esc(victim.name)}</b> <span class="activity-side">(${esc(assignedTeam(victim))})</span>${payout?` <span class="kill-payout">· Kill payout +${money(payout.amount)}</span>`:''}`});
     }else if(type==='capture'){
       const match=message.match(/^([A-Za-z0-9_]{1,16})\s+captured\s+(.+)$/i);
       if(match){const player=playerByName.get(match[1].toLowerCase());if(!player||!assignedTeam(player))continue;const color=TEAM_COLORS[assignedTeam(player).toLowerCase()]||'#879487';visible.push({timestamp,kind:'POINT CAPTURE',html:`<b style="color:${color}">${esc(player.name)}</b> captured <b>Point ${esc(match[2].replace(/^Point\s+/i,''))}</b>`});continue}
@@ -117,7 +138,7 @@ function renderActivity(events){
       const match=message.match(/^([A-Za-z0-9_]{1,16})\s+won\b/i);if(!match)continue;const winner=playerByName.get(match[1].toLowerCase());if(!winner||!assignedTeam(winner))continue;const color=TEAM_COLORS[assignedTeam(winner).toLowerCase()]||'#879487';visible.push({timestamp,kind:'GLADIATORS',html:`<b style="color:${color}">${esc(winner.name)}</b> won a Gladiators match`});
     }
   }
-  for(const gain of observedGains){const player=currentPlayers.find(p=>String(p.uuid||p.name)===gain.id);if(!player||!assignedTeam(player))continue;const color=TEAM_COLORS[assignedTeam(player).toLowerCase()]||'#879487';visible.push({timestamp:gain.timestamp,kind:'BALANCE INCREASE',html:`<b style="color:${color}">${esc(player.name||gain.name)}</b> gained <b class="gain-amount">${money(gain.amount)}</b>`})}
+  for(const gain of observedGains){if(usedGains.has(gain))continue;const player=currentPlayers.find(p=>String(p.uuid||p.name)===gain.id);if(!player||!assignedTeam(player))continue;const color=TEAM_COLORS[assignedTeam(player).toLowerCase()]||'#879487';visible.push({timestamp:gain.timestamp,kind:'BALANCE INCREASE',html:`<b style="color:${color}">${esc(player.name||gain.name)}</b> gained <b class="gain-amount">${money(gain.amount)}</b>`})}
   const recent=visible.sort((a,b)=>b.timestamp-a.timestamp).slice(0,3);
   $('activityStatus').textContent=recent.length?`${number(recent.length)} recent events`:'No recent activity';
   $('activityRows').innerHTML=recent.length?recent.map(event=>`<article class="activity-row"><time datetime="${new Date(event.timestamp||Date.now()).toISOString()}">${formatDate(event.timestamp)}</time><span class="activity-kind">${esc(event.kind)}</span><span class="activity-message">${event.html}</span></article>`).join(''):'<div class="activity-empty">No recent activity involving assigned-team players.</div>';
@@ -138,6 +159,7 @@ async function refresh(){
 $('menuToggle').addEventListener('click',()=>{const open=$('navLinks').classList.toggle('open');$('menuToggle').setAttribute('aria-expanded',String(open));$('menuToggle').setAttribute('aria-label',open?'Close navigation':'Open navigation')});
 document.querySelectorAll('#navLinks a').forEach(link=>link.addEventListener('click',()=>{$('navLinks').classList.remove('open');$('menuToggle').setAttribute('aria-expanded','false')}));
 $('playerSearch').addEventListener('input',()=>renderAllPlayers(currentPlayers));
+$('tierFilter').addEventListener('change',()=>renderAllPlayers(currentPlayers));
 $('allPlayerRows').addEventListener('click',event=>{const button=event.target.closest('.player-toggle');if(!button)return;const id=button.dataset.playerId;if(expandedPlayers.has(id))expandedPlayers.delete(id);else expandedPlayers.add(id);renderAllPlayers(currentPlayers)});
 refresh();setInterval(refresh,5000);
 refreshActivity();setInterval(refreshActivity,5000);
