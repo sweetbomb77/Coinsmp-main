@@ -1,4 +1,5 @@
-const API='/api/stats';
+const API_BASE=String(window.COINSMP_API_BASE||'').trim().replace(/\/$/,'');
+const API=API_BASE?`${API_BASE}/api/stats`:'/api/stats';
 const $=id=>document.getElementById(id);
 const TEAM_ORDER=['red','blue','yellow','green'];
 const TEAM_COLORS={red:'#d76d65',blue:'#6397c5',yellow:'#cfb04c',green:'#66a06b'};
@@ -51,10 +52,11 @@ function renderActivity(events){
   }).join(''):'<div class="activity-empty">No recent activity.</div>';
 }
 async function refreshActivity(){
-  try{const response=await fetch('/api/events',{cache:'no-store'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const events=await response.json();if(!Array.isArray(events))throw new Error('Unexpected response');renderActivity(events)}
+  try{const response=await fetch(API_BASE?`${API_BASE}/api/events`:'/api/events',{cache:'no-store'});if(!response.ok)throw new Error(`HTTP ${response.status}`);const events=await response.json();if(!Array.isArray(events))throw new Error('Unexpected response');renderActivity(events)}
   catch{$('activityStatus').textContent='Activity feed unavailable';$('activityRows').innerHTML='<div class="activity-empty">Could not load recent activity.</div>'}
 }
 async function refresh(){
+  if(!API_BASE&&location.hostname.endsWith('github.io')){$('apiDot').classList.add('error');$('apiStatus').textContent='Configure the HTTPS API proxy in api-config.js';$('teamGrid').innerHTML='<div class="loading-card">GitHub Pages needs an HTTPS API proxy to load live server data.</div>';return}
   let data=null,lastError=null;
   try{const response=await fetch(API,{cache:'no-store'});if(!response.ok)throw new Error(`HTTP ${response.status}`);data=await response.json()}catch(error){lastError=error}
   const dot=$('apiDot');
